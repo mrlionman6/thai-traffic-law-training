@@ -39,17 +39,16 @@ LEARNING_RATE = 2e-4
 
 
 def load_qa_data():
-    """Load the Q&A dataset directly from HuggingFace Hub
-    (no local .jsonl file needed — data already lives at HF_DATASET_REPO).
-    Expects each row to have 'question' and 'answer' fields;
-    edit the field names below if yours differ.
+    """Load the Q&A dataset directly from HuggingFace Hub.
+    The dataset already stores each row as one formatted string:
+        "### คำถาม:\n...\n### คำตอบ:\n..."
+    in a single column (assumed here to be named 'text' — if your
+    column has a different name, change TEXT_COLUMN below).
     """
-    raw_dataset = load_dataset(HF_DATASET_REPO, split="train")
+    TEXT_COLUMN = "text"  # <-- change this if your column name differs
 
-    texts = []
-    for row in raw_dataset:
-        text = f"### คำถาม:\n{row['question']}\n### คำตอบ:\n{row['answer']}"
-        texts.append(text)
+    raw_dataset = load_dataset(HF_DATASET_REPO, split="train")
+    texts = [row[TEXT_COLUMN] for row in raw_dataset]
     return texts
 
 
