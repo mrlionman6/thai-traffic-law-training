@@ -15,7 +15,6 @@ Run with:
     python train.py
 """
 
-import json
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -24,16 +23,14 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 from peft import LoraConfig, get_peft_model, TaskType
-from datasets import Dataset
-from huggingface_hub import HfApi, create_repo
+from datasets import load_dataset, Dataset
 
 # ----------------------------
 # Config — edit these as needed
 # ----------------------------
 BASE_MODEL = "flax-community/gpt2-base-thai"
-DATA_PATH = "data/thai_traffic_qa.jsonl"          # your 15+ Q&A pairs
 HF_MODEL_REPO = "MRlionman6/thai-traffic-law-gpt2"
-HF_DATASET_REPO = "MRlionman6/thai-traffic-law-qa"
+HF_DATASET_REPO = "MRlionman6/thai-traffic-law-qa"  # already pushed to HF Hub
 OUTPUT_DIR = "./output"
 
 NUM_EPOCHS = 20
@@ -41,20 +38,18 @@ BATCH_SIZE = 4
 LEARNING_RATE = 2e-4
 
 
-def load_qa_data(path: str):
-    """Load .jsonl where each line looks like:
-    {"question": "...", "answer": "..."}
-    and format it into the model's training text.
+def load_qa_data():
+    """Load the Q&A dataset directly from HuggingFace Hub
+    (no local .jsonl file needed — data already lives at HF_DATASET_REPO).
+    Expects each row to have 'question' and 'answer' fields;
+    edit the field names below if yours differ.
     """
+    raw_dataset = load_dataset(HF_DATASET_REPO, split="train")
+
     texts = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            text = f"### คำถาม:\n{row['question']}\n### คำตอบ:\n{row['answer']}"
-            texts.append(text)
+    for row in raw_dataset:
+        text = f"### คำถาม:\n{row['question']}\n### คำตอบ:\n{row['answer']}"
+        texts.append(text)
     return texts
 
 
@@ -73,9 +68,9 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
     tokenizer.pad_token = tokenizer.eos_token  # GPT-2 has no pad token by default
 
-    # 2) Load + tokenize dataset
-    print("Loading dataset...")
-    texts = load_qa_data(DATA_PATH)
+    # 2) Load + tokenize dataset (pulled straight from HF Hub)
+    print("Loading dataset from HuggingFace Hub...")
+    texts = load_qa_data()
     dataset = Dataset.from_dict({"text": texts})
     tokenized_dataset = dataset.map(
         lambda ex: tokenize_function(ex, tokenizer),
@@ -142,16 +137,7 @@ def main():
     model.push_to_hub(HF_MODEL_REPO)
     tokenizer.push_to_hub(HF_MODEL_REPO)
 
-    print("Pushing dataset to HuggingFace Hub...")
-    api = HfApi()
-    create_repo(HF_DATASET_REPO, repo_type="dataset", exist_ok=True)
-    api.upload_file(
-        path_or_fileobj=DATA_PATH,
-        path_in_repo="thai_traffic_qa.jsonl",
-        repo_id=HF_DATASET_REPO,
-        repo_type="dataset",
-    )
-
+    # Dataset already lives on HF Hub (HF_DATASET_REPO) — nothing to re-upload here.
     print("\nDone.")
 
 
