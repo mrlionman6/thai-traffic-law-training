@@ -1,25 +1,16 @@
+
 """
 train.py
-========
-เทรน flax-community/gpt2-base-thai ด้วย LoRA บน dataset ที่มีอยู่แล้วบน HuggingFace Hub
-
-ไฟล์นี้ "ไม่สร้างข้อมูลใหม่" — สมมติว่า dataset (HF_DATASET_REPO) มีอยู่แล้ว
-ถ้ายังไม่มี dataset ให้รัน setup_dataset.py ก่อน
+Fine-tune flax-community/gpt2-base-thai with LoRA on a Thai traffic-law Q&A dataset.
 
 Pipeline:
-1. โหลด dataset จาก HF Hub (ไม่ใช่จากไฟล์ local)
+1. Load Q&A data (.jsonl)
 2. Tokenize
-3. ตั้งค่า LoRA
-4. โหลดโมเดล base + แก้ embedding size
-5. เทรน (SFT) ด้วย Trainer
-6. ทดสอบ generate (มี repetition_penalty กันโมเดลพิมพ์ซ้ำ)
-7. Push โมเดลที่เทรนแล้วขึ้น HuggingFace Hub
-
-⚠️ ก่อนรัน ต้อง login HuggingFace ก่อน (ต้อง permission เป็น Write):
-    from huggingface_hub import login
-    login(token="hf_xxxxxxxxxxxx")   # หรือดึงจาก Kaggle Secrets
-
-หมายเหตุ: ทุกครั้งที่รันไฟล์นี้ = เทรนใหม่ตั้งแต่ต้น (ไม่มี resume/checkpoint)
+3. Set up LoRA
+4. Load base model + fix embedding size
+5. Train (SFT) with Trainer
+6. Test generation (with repetition_penalty to avoid loops)
+7. Push model + dataset to HuggingFace Hub
 
 Run with:
     python train.py
@@ -132,14 +123,12 @@ def main():
     # 6) Quick test generation
     print("\nTesting generation...")
     test_prompt = "### คำถาม:\nใบขับขี่หมดอายุกี่ปีต้องต่อใหม่?\n### คำตอบ:\n"
-    inputs = tokenizer(test_prompt, return_tensors="pt").to("cuda")
+    input_ids = tokenizer(test_prompt, return_tensors="pt").input_ids.to("cuda")
     output_ids = model.generate(
-        input_ids=inputs["input_ids"],
-        attention_mask=inputs["attention_mask"],  # fixes attention-mask warning
+        input_ids,
         max_new_tokens=100,
         do_sample=False,
         repetition_penalty=1.3,  # fixes repetition-loop issue
-        pad_token_id=tokenizer.pad_token_id,
     )
     print(tokenizer.decode(output_ids[0], skip_special_tokens=True))
 
