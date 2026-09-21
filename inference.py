@@ -24,13 +24,18 @@ FINETUNED_MODEL = "MRlionman6/thai-traffic-law-gpt2"
 
 def load_model():
     """โหลด base model + LoRA adapter ที่เทรนแล้วจาก HF Hub"""
+    print("Loading tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(FINETUNED_MODEL)
+
     print("Loading base model...")
     base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL)
 
+    # สำคัญ: ต้อง resize embeddings ให้ตรงกับตอนเทรน (train.py ทำขั้นตอนนี้
+    # ก่อนผูก LoRA เช่นกัน) ไม่งั้นจะเจอ "size mismatch" ตอนโหลด adapter
+    base_model.resize_token_embeddings(len(tokenizer))
+
     print("Loading fine-tuned LoRA adapter...")
     model = PeftModel.from_pretrained(base_model, FINETUNED_MODEL).to("cuda")
-
-    tokenizer = AutoTokenizer.from_pretrained(FINETUNED_MODEL)
 
     return model, tokenizer
 
